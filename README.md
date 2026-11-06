@@ -1,57 +1,66 @@
-# T7 – Weekly Status Report Generator (TPM tool)
+# Weekly status report generator
 
-**Problem it solves:** in the "Monday morning" scenario, the Ledger client did not get Friday's status report, and the COO heard about a data problem from someone else. A TPM running two projects should never miss a Friday report. This tool reads the project tracker (Task 5) and writes a client-ready weekly status report for **each** client in seconds, so the Friday report is a 2-minute job: update the tracker, run the tool, read it once, send it.
+A small command-line tool for a TPM running more than one client project. It reads the project tracker (the Task 5 Excel file, or CSV exports of its two tabs) and writes a weekly status report for each client as Markdown.
 
-**What it produces** (one Markdown file per project):
-- Overall RAG status, next milestone and date, main point of the week
-- Open risks and issues ranked by score (Probability × Impact), overdue ones flagged
-- Actions due in the next 7 days, with owner
-- Items closed since the last report
-- "Where we need you" – actions that sit with the client
+## Why I built this one
 
-Markdown pastes cleanly into Gmail, Notion, Slack or a Google Doc.
+In the assignment scenario the Ledger client didn't get Friday's report, and the COO heard about a data problem from someone else before he heard it from us. That's the kind of thing that costs you trust far out of proportion to the actual problem. If I'm already keeping the tracker up to date during the week, the Friday report should fall out of it in a couple of minutes, not take an hour of rewriting. So: update tracker, run tool, read it once, send.
 
-## How to run
+Each report has:
 
-Requirements: Python 3.9+ and `openpyxl` (only needed for `.xlsx` input).
+- overall RAG, next milestone and its date, the main point of the week
+- open risks and issues ranked by probability × impact, with overdue items flagged
+- what's due in the next 7 days and who owns it
+- what got closed since last time
+- a "where we need you" section for anything that sits with the client
+
+Markdown because it pastes cleanly into Gmail, Slack, Notion or a Google Doc without fuss.
+
+## Running it
+
+Python 3.9 or newer. `openpyxl` only if you feed it an .xlsx.
 
 ```bash
 pip install openpyxl
 
-# From the Excel tracker (tabs: "Summary" and "Risks & Issues")
+# from the Excel tracker (needs tabs called "Summary" and "Risks & Issues")
 python status_report.py --tracker sample_tracker.xlsx --date 2026-11-13 --out reports
 
-# From CSV exports of the two tabs
+# or from CSV exports of the two tabs
 python status_report.py --summary sample_summary.csv --risks sample_risks.csv --date 2026-11-13
 
-# Run the tests
+# tests
 python test_status_report.py
 ```
 
-Output example: `reports/2026-11-13_Kavach_status.md`. If `--date` is omitted, today's date is used; "overdue" means due before that date and not Closed.
+You get one file per project, e.g. `reports/2026-11-13_Kavach_status.md`. Leave out `--date` and it uses today. "Overdue" means due before the report date and not marked Closed.
 
-**Tracker columns expected**
+Columns it expects:
+
 - Summary: `Project, Client, Status (RAG), Next milestone, Milestone date, Main problem, Owner`
 - Risks & Issues: `ID, Project, Type, Description, Probability, Impact, Owner, Action, Due date, Status`
 
-Probability and Impact are `Low / Medium / High`; the tool recomputes the score itself so a CSV without a Score column still works.
+Probability and Impact are Low / Medium / High. The score is recomputed in the tool, so a CSV without a Score column is fine.
 
-## How I used AI to build it
+## How the AI was used
 
-Built with Claude (Claude Code–style agent session) in about 1.5 hours including the tracker. I wrote the requirements and reviewed every run; the AI wrote the code.
+I built this with Claude in an agent session, alongside the tracker. Roughly an hour and a half for both. I wrote what I wanted and checked each run; the AI wrote the code.
 
-**Prompts I used (shortened):**
-1. *"Build a Python CLI that reads my project tracker Excel file (tabs 'Summary' and 'Risks & Issues') and writes one weekly status report per client as Markdown. Rank open items by Probability × Impact, flag overdue items against a `--date` argument, list actions due in the next 7 days, and items closed. Use only the standard library plus openpyxl. Also accept two CSV files instead of the Excel file."*
-2. *"Run it on the real tracker for 2026-11-13 and show me the Kavach report."*
-3. *"The report lists overdue items twice (once in an 'Overdue' section and again under 'Top risks'). Merge into one ranked list with an OVERDUE flag, and add a 'Where we need you' section for actions owned by the client."*
-4. *"Add a few smoke tests for the scoring, the overdue/this-week/later buckets, and date parsing from Excel serial numbers."*
+The prompts, shortened a bit:
 
-**Errors the AI made and how I corrected them**
+1. "Build a Python CLI that reads my project tracker Excel file (tabs 'Summary' and 'Risks & Issues') and writes one weekly status report per client as Markdown. Rank open items by Probability × Impact, flag overdue items against a `--date` argument, list actions due in the next 7 days and items closed. Standard library plus openpyxl only. Also accept two CSV files instead of the Excel file."
+2. "Run it on the real tracker for 2026-11-13 and show me the Kavach report."
+3. "It lists overdue items twice, once in an 'Overdue' section and again under 'Top risks'. Make it one ranked list with an OVERDUE flag, and add a 'Where we need you' section for actions owned by the client."
+4. "Add a few smoke tests: the scoring, the overdue / this week / later buckets, and date parsing from Excel serial numbers."
 
-1. **Legend rows became "projects".** The Summary tab has a small legend under the table (the RAG rule: Red / Amber / Green, and a "Report date" input cell). The first version filtered Summary rows only on "column A is not empty", so the tool generated six reports: Kavach, Ledger, *and* "Red", "Amber", "Green" and "Report date (edit):". I spotted it in the console output (`wrote reports/2026-11-13_Red_status.md`). Fix: a row is a project only if its `Status (RAG)` is one of Red/Amber/Green **and** it has a milestone date. Lesson: tell the AI what else lives on the sheet, not only the table.
-2. **Wrong column in a tracker formula.** While building the tracker that feeds this tool, the AI wrote the "Open High-impact risks" count as `COUNTIFS(... Probability = "High" ...)` instead of the Impact column. The numbers looked plausible (4 and 3), which is exactly why I checked them by hand against the risk list (should be 5 and 1). Fix: point the formula at column F (Impact). Lesson: a formula that returns a believable number is not a correct formula – verify one value manually.
+### Mistakes it made, and what I did about them
+
+**It thought my legend was a list of projects.** Under the table on the Summary tab I have a small legend explaining the RAG rule (a Red row, an Amber row, a Green row) and a "report date" cell. The first version only checked that column A wasn't empty, so it happily produced six reports: Kavach, Ledger, Red, Amber, Green, and one called "Report date (edit):". I noticed it in the console output. The fix was to say a row is a project only if its RAG status is actually Red, Amber or Green *and* it has a milestone date. The lesson for me was to describe what else is on the sheet, not just the table I care about.
+
+**A formula pointed at the wrong column.** This one was in the tracker rather than the tool, but the tool reads the tracker so it would have carried through. The "open high-impact risks" count was written against the Probability column instead of Impact. It returned 4 and 3, which look perfectly reasonable, and that's precisely why I counted one of them by hand against the risk list (should have been 5 and 1). Changed the reference to the Impact column. A number that looks plausible is not the same as a number that's right.
 
 ## Files
+
 - `status_report.py` – the tool
 - `test_status_report.py` – smoke tests
 - `sample_tracker.xlsx`, `sample_summary.csv`, `sample_risks.csv` – the Task 5 tracker as sample input
