@@ -1,0 +1,3 @@
+Project,Client,Status (RAG),Next milestone,Milestone date,Days to milestone,Main problem,Open risks (High impact),Overdue actions,Owner,Last updated
+Kavach,Nirmal Finance (CTO),Red,Client UAT starts,2026-11-12,3,"4/50 test calls quoted a wrong EMI amount; telecom IP change needs client network approval (3 working days); AI engineer on leave Wed–Fri. Go-live Mon 16 Nov proposed as phased pilot, decision Fri 13 Nov.",5,0,Ayush Supakar,2026-11-09
+Ledger,Sagar Publications (COO),Amber,Sprint 4 demo + clean re-run of test migration,2026-11-13,4,"1,200 duplicate customers in test migration (phone-number formats); Friday status report missed; new scope request (WhatsApp birthday offers) under change request CR-L-01.",1,0,Ayush Supakar,2026-11-09
